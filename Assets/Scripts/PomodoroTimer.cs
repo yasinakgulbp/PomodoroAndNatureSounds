@@ -20,6 +20,8 @@ public class PomodoroTimer : MonoBehaviour
     public Button yesButton;
     public Button cancelButton;
 
+    public AudioManager audioManager;
+
     private int defaultWorkDuration = 25 * 60;  // 25 minutes
     private int defaultShortBreakDuration = 5 * 60;  // 5 minutes
     private int defaultLongBreakDuration = 15 * 60;  // 15 minutes
@@ -48,25 +50,49 @@ public class PomodoroTimer : MonoBehaviour
 
     void Start()
     {
-        timerText.text = FormatTime(workDuration);
-        statusText.text = "Work Session";
-        UpdateSessionStatusText();
-
-        // InputField'larý baþlangýçta doldurun
-        workDurationInput.text = (workDuration / 60).ToString();
-        shortBreakInput.text = (shortBreakDuration / 60).ToString();
-        longBreakInput.text = (longBreakDuration / 60).ToString();
-        cycleCountInput.text = cyclesBeforeLongBreak.ToString();
+        InitializeTimer();
+        UpdateInputFields();
 
         startStopButton.GetComponentInChildren<TextMeshProUGUI>().text = "Start";
-        startStopButton.onClick.AddListener(ToggleTimer);
-        resetButton.GetComponentInChildren<TextMeshProUGUI>().text = "Reset";
-        resetButton.onClick.AddListener(ShowResetConfirmationPanel);
-        applyButton.GetComponentInChildren<TextMeshProUGUI>().text = "Apply";
-        applyButton.onClick.AddListener(ApplySettings);
+        startStopButton.onClick.AddListener(() =>
+        {
+            ToggleTimer();
+            audioManager.PlayButtonClickSound();
+        });
 
-        yesButton.onClick.AddListener(ConfirmReset);
-        cancelButton.onClick.AddListener(HideResetConfirmationPanel);
+        resetButton.GetComponentInChildren<TextMeshProUGUI>().text = "Reset";
+        resetButton.onClick.AddListener(() =>
+        {
+            ShowResetConfirmationPanel();
+            audioManager.PlayButtonClickSound();
+        });
+
+        applyButton.GetComponentInChildren<TextMeshProUGUI>().text = "Apply";
+        applyButton.onClick.AddListener(() =>
+        {
+            ApplySettings();
+            audioManager.PlayButtonClickSound();
+        });
+
+        yesButton.onClick.AddListener(() =>
+        {
+            ConfirmReset();
+            audioManager.PlayButtonClickSound();
+        });
+
+        cancelButton.onClick.AddListener(() =>
+        {
+            HideResetConfirmationPanel();
+            audioManager.PlayButtonClickSound();
+        });
+    }
+
+    void InitializeTimer()
+    {
+        currentTime = workDuration;
+        timerText.text = FormatTime(currentTime);
+        statusText.text = "Work Session";
+        UpdateSessionStatusText();
     }
     #endregion
 
@@ -168,13 +194,7 @@ public class PomodoroTimer : MonoBehaviour
             SettingsManager.SetCycleCount(cyclesBeforeLongBreak);
         }
 
-        StopTimer();
-        cycleCount = 0;
-        isWorkSession = true;
-        currentTime = workDuration;
-        timerText.text = FormatTime(currentTime);
-        statusText.text = "Work Session";
-        UpdateSessionStatusText();
+        InitializeTimer();
     }
 
     void LoadSettings()
@@ -195,52 +215,52 @@ public class PomodoroTimer : MonoBehaviour
 
     void UpdateSessionStatusText()
     {
-        sessionStatusText.text = string.Format("{0}/{1} Cycles", cycleCount % cyclesBeforeLongBreak, cyclesBeforeLongBreak);
+        sessionStatusText.text = string.Format("{0}/{1}", cycleCount, cyclesBeforeLongBreak);
     }
     #endregion
 
-    #region Timer Coroutine
+    #region Timer Logic
     IEnumerator RunTimer()
     {
-        currentTime = isWorkSession ? workDuration : (cycleCount % cyclesBeforeLongBreak == 0 ? longBreakDuration : shortBreakDuration);
         while (currentTime > 0)
         {
             timerText.text = FormatTime(currentTime);
             yield return new WaitForSeconds(1);
             currentTime--;
         }
-        TimerEnded();
+
+        OnTimerEnd();
     }
 
-    void TimerEnded()
+    void OnTimerEnd()
     {
+        isRunning = false;
+        startStopButton.GetComponentInChildren<TextMeshProUGUI>().text = "Start";
+
         if (isWorkSession)
         {
             cycleCount++;
-            if (cycleCount % cyclesBeforeLongBreak == 0)
-            {
-                statusText.text = "Long Break";
-                currentTime = longBreakDuration;
-            }
-            else
-            {
-                statusText.text = "Short Break";
-                currentTime = shortBreakDuration;
-            }
+            audioManager.PlaySessionChangeSound();
+        }
+
+        if (cycleCount >= cyclesBeforeLongBreak)
+        {
+            isWorkSession = false;
+            currentTime = longBreakDuration;
+            cycleCount = 0;
+            statusText.text = "Long Break";
         }
         else
         {
-            statusText.text = "Work Session";
-            currentTime = workDuration;
+            isWorkSession = !isWorkSession;
+            currentTime = isWorkSession ? workDuration : shortBreakDuration;
+            statusText.text = isWorkSession ? "Work Session" : "Short Break";
         }
 
-        isWorkSession = !isWorkSession;
         UpdateSessionStatusText();
-        StartTimer();
+        timerText.text = FormatTime(currentTime);
     }
-    #endregion
 
-    #region Utility
     string FormatTime(int time)
     {
         int minutes = time / 60;
