@@ -5,7 +5,8 @@ public class AudioManager : MonoBehaviour
 {
     #region Variables
     public AudioClip[] backgroundMusic;
-    public AudioClip sessionChangeSound;
+    public AudioClip workSessionEndSound;
+    public AudioClip breakEndSound;
     public AudioClip buttonClickSound;
 
     public AudioSource backgroundMusicSource;
@@ -52,9 +53,10 @@ public class AudioManager : MonoBehaviour
     #endregion
 
     #region Sound Effects
-    public void PlaySessionChangeSound()
+    public void PlaySessionChangeSound(bool isWorkSessionEnd)
     {
-        effectsSource.PlayOneShot(sessionChangeSound);
+        AudioClip clip = isWorkSessionEnd ? workSessionEndSound : breakEndSound;
+        effectsSource.PlayOneShot(clip);
     }
 
     public void PlayButtonClickSound()

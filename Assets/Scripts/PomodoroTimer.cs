@@ -9,6 +9,7 @@ public class PomodoroTimer : MonoBehaviour
     public TextMeshProUGUI timerText;
     public Button startStopButton;
     public Button resetButton;
+    public Button autoModeButton;
     public TextMeshProUGUI statusText;
     public TextMeshProUGUI sessionStatusText;
     public TMP_InputField workDurationInput;
@@ -37,12 +38,13 @@ public class PomodoroTimer : MonoBehaviour
     private bool isWorkSession = true;
     private int cycleCount = 0;
     private Coroutine timerCoroutine;
+    private bool autoMode = false;
     #endregion
 
     #region Initialization
     void Awake()
     {
-        Application.targetFrameRate = 30;  // Pil tüketimini azaltmak için frame rate düþürülür
+        Application.targetFrameRate = 10;  // Pil tüketimini azaltmak için frame rate düþürülür
 
         // Süreleri PlayerPrefs'ten yükleyin veya varsayýlan deðerlere ayarlayýn
         LoadSettings();
@@ -85,6 +87,14 @@ public class PomodoroTimer : MonoBehaviour
             HideResetConfirmationPanel();
             audioManager.PlayButtonClickSound();
         });
+
+        autoModeButton.onClick.AddListener(() =>
+        {
+            ToggleAutoMode();
+            audioManager.PlayButtonClickSound();
+        });
+
+        LoadAutoModeSetting();
     }
 
     void InitializeTimer()
@@ -128,6 +138,19 @@ public class PomodoroTimer : MonoBehaviour
         {
             StopCoroutine(timerCoroutine);
         }
+    }
+
+    void ToggleAutoMode()
+    {
+        autoMode = !autoMode;
+        autoModeButton.GetComponentInChildren<TextMeshProUGUI>().text = autoMode ? "ON" : "OFF";
+        PlayerPrefs.SetInt("AutoMode", autoMode ? 1 : 0);
+    }
+
+    void LoadAutoModeSetting()
+    {
+        autoMode = PlayerPrefs.GetInt("AutoMode", 0) == 1;
+        autoModeButton.GetComponentInChildren<TextMeshProUGUI>().text = autoMode ? "ON" : "OFF";
     }
     #endregion
 
@@ -240,7 +263,11 @@ public class PomodoroTimer : MonoBehaviour
         if (isWorkSession)
         {
             cycleCount++;
-            audioManager.PlaySessionChangeSound();
+            audioManager.PlaySessionChangeSound(true);  // True means work session ended
+        }
+        else
+        {
+            audioManager.PlaySessionChangeSound(false);  // False means break ended
         }
 
         if (cycleCount >= cyclesBeforeLongBreak)
@@ -259,6 +286,11 @@ public class PomodoroTimer : MonoBehaviour
 
         UpdateSessionStatusText();
         timerText.text = FormatTime(currentTime);
+
+        if (autoMode)
+        {
+            StartTimer();
+        }
     }
 
     string FormatTime(int time)
